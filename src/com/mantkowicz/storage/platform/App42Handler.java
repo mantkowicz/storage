@@ -1,9 +1,16 @@
 package com.mantkowicz.storage.platform;
 
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.mantkowicz.storage.callback.Callback;
+import com.mantkowicz.storage.exception.TableNameException;
 import com.mantkowicz.storage.handler.AbstractStorageHandler;
 import com.mantkowicz.storage.operator.Condition;
 import com.mantkowicz.storage.operator.ConditionOperator;
@@ -20,7 +27,9 @@ public class App42Handler extends AbstractStorageHandler {
 	private ServiceAPI serviceAPI;
 	private String API_KEY, SECRET_KEY;
 	
-	private StorageService storageService;	
+	private StorageService storageService;
+	
+	private HashMap<Class<?>, String> tableNames = new HashMap<>();
 	
 	public App42Handler(String databaseName, String API_KEY, String SECRET_KEY) {
 		super(databaseName);
@@ -35,14 +44,22 @@ public class App42Handler extends AbstractStorageHandler {
 	}
 
 	@Override
+	public <T extends AbstractRecord> void registerEntity(Class<T> type, String tableName) {
+		if(!tableNames.containsKey(type)) {
+			tableNames.put(type, tableName);
+		}
+	}
+	
+	@Override
 	public <T extends AbstractRecord> String insert(T object, Callback callback) {
+		Gson gson = new GsonBuilder().serializeNulls().create();
 		String documentId = "";
 		
 		if(callback != null) {
-			storageService.insertJSONDocument(this.getDatabaseName(), object.getTableName(), object.toJson(), callback);
+			storageService.insertJSONDocument(this.getDatabaseName(), getTableName(object.getClass()), gson.toJson(object), callback);
 		}
 		else {
-			Storage storage = storageService.insertJSONDocument(this.getDatabaseName(), object.getTableName(), object.toJson());
+			Storage storage = storageService.insertJSONDocument(this.getDatabaseName(), getTableName(object.getClass()), gson.toJson(object));
 			documentId = storage.getJsonDocList().get(0).getDocId();
 		}
 		
@@ -50,7 +67,9 @@ public class App42Handler extends AbstractStorageHandler {
 	}
 
 	@Override
-	public <T extends AbstractRecord> List<T> select(List<T> objects, List<Condition> conditions, Callback callback) {
+	public <T extends AbstractRecord> List<T> select(Class<T> type, Integer maxRecordCount, List<Condition> conditions, Callback callback) {
+		Gson gson = new GsonBuilder().serializeNulls().create();
+		
 		List<Query> queries = new LinkedList<Query>();
 		
 		for(Condition condition : conditions) {
@@ -70,28 +89,37 @@ public class App42Handler extends AbstractStorageHandler {
 			}
 		}
 		
-		//FIXME to check whether the objects list is not null and to handle this properly
-		if(objects.size() == 0) {
-			return null;
-		}
+		List<T> objects = new LinkedList<>();
 		
-		int max = objects.size();
-		
-		Storage storage = storageService.findDocumentsByQueryWithPaging(this.getDatabaseName(), objects.get(0).getTableName(), query, max, 0);
-		List<Storage.JSONDocument> jsonDocList = storage.getJsonDocList();
-		
-		for(int i=0; i<jsonDocList.size(); i++) {
-			String jsonString = jsonDocList.get(i).getJsonDoc();
-			objects.get(i).loadJson(jsonString); 
+		Storage storage = storageService.findDocumentsByQueryWithPaging(this.getDatabaseName(), getTableName(type), query, maxRecordCount, 0);
+				
+		for(Storage.JSONDocument jsonDocument : storage.getJsonDocList()) {
+			objects.add(gson.fromJson(jsonDocument.getJsonDoc(), type));
 		}
 		
 		return objects;
 	}
 
 	@Override
-	public <T extends AbstractRecord> void update(Long objectId, T object, Callback callback) {
-		// TODO Auto-generated method stub
+	public <T extends AbstractRecord> void update(String objectId, T object, Callback callback) {
+		Gson gson = new GsonBuilder().create(); //Do not serialize null fields
+		JSONObject jsonUpdateObject = null;
 		
+		System.out.println(gson.toJson(object));
+		
+		try {
+			jsonUpdateObject = new JSONObject( gson.toJson(object) );
+		} catch (JSONException e1) {
+			e1.printStackTrace();
+		}
+				
+		try {
+			jsonUpdateObject = new JSONObject(gson.toJson(object));
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		storageService.addOrUpdateKeys(this.getDatabaseName(), getTableName(object.getClass()), objectId, jsonUpdateObject);
 	}
 	
 	private Operator parseOperator(ConditionOperator operator) {
@@ -112,6 +140,17 @@ public class App42Handler extends AbstractStorageHandler {
 				return Operator.LIKE;
 			default:
 				return Operator.EQUALS;
+		}
+	}
+	
+	private String getTableName(Class<?> type) {
+		String tableName = tableNames.get(type);
+		
+		if(tableName == null) {
+			throw new TableNameException("Entity " + type.getSimpleName() + " has not been registered yet. Use registerEntity() method firstly.");
+		}
+		else {
+			return tableName;
 		}
 	}
 }

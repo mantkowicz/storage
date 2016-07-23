@@ -1,7 +1,13 @@
 package com.mantkowicz.storage.record;
 
 public abstract class AbstractRecord {
-	abstract public String getTableName();
-	abstract public String toJson();
-	abstract public void loadJson(String jsonString);
+	private transient boolean isUpdate;
+
+	public AbstractRecord(boolean isUpdate) {
+		this.isUpdate = isUpdate;
+	}
+	
+	public boolean isUpdate() {
+		return isUpdate;
+	} 
 }

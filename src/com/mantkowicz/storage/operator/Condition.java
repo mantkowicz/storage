@@ -5,7 +5,7 @@ public class Condition {
 	public Object value;
 	public ConditionOperator operator;
 
-	public Condition(String key, Object value, ConditionOperator operator) {
+	public Condition(String key, ConditionOperator operator, Object value) {
 		super();
 		this.key = key;
 		this.value = value;

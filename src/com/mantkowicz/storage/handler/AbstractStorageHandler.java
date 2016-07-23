@@ -14,9 +14,10 @@ public abstract class AbstractStorageHandler {
 	}
 		
 	public abstract void connect();
+	public abstract <T extends AbstractRecord> void registerEntity(Class<T> type, String tableName);
 	public abstract <T extends AbstractRecord> String insert(T object, Callback callback);
-	public abstract <T extends AbstractRecord> List<T> select(List<T> objects, List<Condition> conditions, Callback callback);
-	public abstract <T extends AbstractRecord> void update(Long objectId, T object, Callback callback);
+	public abstract <T extends AbstractRecord> List<T> select(Class<T> type, Integer maxRecordCount, List<Condition> conditions, Callback callback);
+	public abstract <T extends AbstractRecord> void update(String objectId, T object, Callback callback);
 	
 	public String getDatabaseName() {
 		return databaseName;
