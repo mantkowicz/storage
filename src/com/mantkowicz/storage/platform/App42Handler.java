@@ -10,11 +10,13 @@ import org.json.JSONObject;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.mantkowicz.storage.callback.Callback;
+import com.mantkowicz.storage.exception.ConditionException;
 import com.mantkowicz.storage.exception.TableNameException;
 import com.mantkowicz.storage.handler.AbstractStorageHandler;
 import com.mantkowicz.storage.operator.Condition;
-import com.mantkowicz.storage.operator.ConditionOperator;
-import com.mantkowicz.storage.record.AbstractRecord;
+import com.mantkowicz.storage.operator.ConditionAND;
+import com.mantkowicz.storage.operator.ConditionOR;
+import com.mantkowicz.storage.operator.Operators;
 import com.shephertz.app42.paas.sdk.java.ServiceAPI;
 import com.shephertz.app42.paas.sdk.java.storage.Query;
 import com.shephertz.app42.paas.sdk.java.storage.QueryBuilder;
@@ -29,12 +31,16 @@ public class App42Handler extends AbstractStorageHandler {
 	
 	private StorageService storageService;
 	
+	Gson gson;
+	
 	private HashMap<Class<?>, String> tableNames = new HashMap<>();
 	
 	public App42Handler(String databaseName, String API_KEY, String SECRET_KEY) {
 		super(databaseName);
 		this.API_KEY = API_KEY;
 		this.SECRET_KEY = SECRET_KEY;
+		
+		this.gson = new GsonBuilder().create();
 	}
 
 	@Override
@@ -44,15 +50,14 @@ public class App42Handler extends AbstractStorageHandler {
 	}
 
 	@Override
-	public <T extends AbstractRecord> void registerEntity(Class<T> type, String tableName) {
+	public <T> void registerEntity(Class<T> type, String tableName) {
 		if(!tableNames.containsKey(type)) {
 			tableNames.put(type, tableName);
 		}
 	}
 	
 	@Override
-	public <T extends AbstractRecord> String insert(T object, Callback callback) {
-		Gson gson = new GsonBuilder().serializeNulls().create();
+	public <T> String insert(T object, Callback callback) {
 		String documentId = "";
 		
 		if(callback != null) {
@@ -67,30 +72,10 @@ public class App42Handler extends AbstractStorageHandler {
 	}
 
 	@Override
-	public <T extends AbstractRecord> List<T> select(Class<T> type, Integer maxRecordCount, List<Condition> conditions, Callback callback) {
-		Gson gson = new GsonBuilder().serializeNulls().create();
-		
-		List<Query> queries = new LinkedList<Query>();
-		
-		for(Condition condition : conditions) {
-			queries.add(QueryBuilder.build(condition.key, condition.value, parseOperator(condition.operator)));
-		}
-		
-		//FIXME to check whether the queries list is not null and to handle this properly
-		if(queries.size() == 0) {
-			return null;
-		}
-		
-		Query query = queries.get(0);
-		
-		if(queries.size() > 1) {			
-			for(int i = 1; i < queries.size(); i++) {
-				query = QueryBuilder.compoundOperator(query, Operator.AND, queries.get(i));
-			}
-		}
-		
+	public <T> List<T> select(Class<T> type, Integer maxRecordCount, Condition condition, Callback callback) {		
 		List<T> objects = new LinkedList<>();
-		
+		Query query = resolveQuery(condition);
+			
 		Storage storage = storageService.findDocumentsByQueryWithPaging(this.getDatabaseName(), getTableName(type), query, maxRecordCount, 0);
 				
 		for(Storage.JSONDocument jsonDocument : storage.getJsonDocList()) {
@@ -101,8 +86,7 @@ public class App42Handler extends AbstractStorageHandler {
 	}
 
 	@Override
-	public <T extends AbstractRecord> void update(String objectId, T object, Callback callback) {
-		Gson gson = new GsonBuilder().create(); //Do not serialize null fields
+	public <T> void update(String objectId, T object, Callback callback) {
 		JSONObject jsonUpdateObject = null;
 		
 		System.out.println(gson.toJson(object));
@@ -122,7 +106,34 @@ public class App42Handler extends AbstractStorageHandler {
 		storageService.addOrUpdateKeys(this.getDatabaseName(), getTableName(object.getClass()), objectId, jsonUpdateObject);
 	}
 	
-	private Operator parseOperator(ConditionOperator operator) {
+	@Override
+	public <T> void remove(Class<T> type, String objectId, Callback callback) {
+		storageService.deleteDocumentById(this.getDatabaseName(), getTableName(type), objectId);  
+	}
+	
+	private Query resolveQuery(Condition condition) {
+		if(condition instanceof ConditionAND) {
+			Query queryA = resolveQuery(((ConditionAND) condition).conditionA);
+			Query queryB = resolveQuery(((ConditionAND) condition).conditionB);
+						
+			return QueryBuilder.compoundOperator(queryA, Operator.AND, queryB);
+		}
+		else if(condition instanceof ConditionOR) {
+			Query queryA = resolveQuery(((ConditionOR) condition).conditionA);
+			Query queryB = resolveQuery(((ConditionOR) condition).conditionB);
+			
+			return QueryBuilder.compoundOperator(queryA, Operator.OR, queryB);
+		}
+		else {
+			if(condition.key == null) {
+				throw new ConditionException("Condition's key cannot be null. Did you initialize the condition properly?");
+			}
+			
+			return QueryBuilder.build(condition.key, condition.value, parseOperator(condition.operator));
+		}
+	}
+	
+	private Operator parseOperator(Operators operator) {
 		switch(operator) {
 			case EQ:
 				return Operator.EQUALS;

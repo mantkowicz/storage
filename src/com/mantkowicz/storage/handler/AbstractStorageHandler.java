@@ -4,7 +4,6 @@ import java.util.List;
 
 import com.mantkowicz.storage.callback.Callback;
 import com.mantkowicz.storage.operator.Condition;
-import com.mantkowicz.storage.record.AbstractRecord;
 
 public abstract class AbstractStorageHandler {
 	private String databaseName = "";
@@ -14,10 +13,11 @@ public abstract class AbstractStorageHandler {
 	}
 		
 	public abstract void connect();
-	public abstract <T extends AbstractRecord> void registerEntity(Class<T> type, String tableName);
-	public abstract <T extends AbstractRecord> String insert(T object, Callback callback);
-	public abstract <T extends AbstractRecord> List<T> select(Class<T> type, Integer maxRecordCount, List<Condition> conditions, Callback callback);
-	public abstract <T extends AbstractRecord> void update(String objectId, T object, Callback callback);
+	public abstract <T> void registerEntity(Class<T> type, String tableName);
+	public abstract <T> String insert(T object, Callback callback);
+	public abstract <T> List<T> select(Class<T> type, Integer maxRecordCount, Condition condition, Callback callback);
+	public abstract <T> void update(String objectId, T object, Callback callback);
+	public abstract <T> void remove(Class<T> type, String objectId, Callback callback);
 	
 	public String getDatabaseName() {
 		return databaseName;

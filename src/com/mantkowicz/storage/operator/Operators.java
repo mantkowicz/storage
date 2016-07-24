@@ -1,6 +1,6 @@
 package com.mantkowicz.storage.operator;
 
-public enum ConditionOperator {
+public enum Operators {
 	EQ,
 	NE,
 	GT,
