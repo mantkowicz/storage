@@ -24,7 +24,7 @@ import com.shephertz.app42.paas.sdk.java.storage.QueryBuilder.Operator;
 import com.shephertz.app42.paas.sdk.java.storage.Storage;
 import com.shephertz.app42.paas.sdk.java.storage.StorageService;
 
-public class App42Handler extends AbstractStorageHandler {
+public class App42StorageHandler extends AbstractStorageHandler {
 
 	private ServiceAPI serviceAPI;
 	private String API_KEY, SECRET_KEY;
@@ -35,7 +35,7 @@ public class App42Handler extends AbstractStorageHandler {
 	
 	private HashMap<Class<?>, String> tableNames = new HashMap<>();
 	
-	public App42Handler(String databaseName, String API_KEY, String SECRET_KEY) {
+	public App42StorageHandler(String databaseName, String API_KEY, String SECRET_KEY) {
 		super(databaseName);
 		this.API_KEY = API_KEY;
 		this.SECRET_KEY = SECRET_KEY;
