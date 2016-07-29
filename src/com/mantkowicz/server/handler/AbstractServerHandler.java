@@ -6,5 +6,4 @@ public abstract class AbstractServerHandler {
 	}
 		
 	public abstract void connect();
-	public abstract Long getServerTime();
 }

@@ -1,14 +1,21 @@
 package com.mantkowicz.server.platform;
 
-import org.json.JSONException;
-import org.json.JSONObject;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import org.apache.commons.net.ntp.NTPUDPClient;
+import org.apache.commons.net.ntp.TimeInfo;
 
 import com.mantkowicz.server.handler.AbstractServerHandler;
 import com.shephertz.app42.paas.sdk.java.ServiceAPI;
 import com.shephertz.app42.paas.sdk.java.customcode.CustomCodeService;
 
 public class App42ServerHandler extends AbstractServerHandler {
-
+	private static final Logger LOGGER = Logger.getLogger(App42ServerHandler.class.getName());
+	
 	private ServiceAPI serviceAPI;
 	private String API_KEY, SECRET_KEY;
 	
@@ -25,25 +32,25 @@ public class App42ServerHandler extends AbstractServerHandler {
 	@Override
 	public void connect() {
 		serviceAPI = new ServiceAPI(this.API_KEY, this.SECRET_KEY); 
-		customCodeService = serviceAPI.buildCustomCodeService();
 	}
 
-	@Override
-	public Long getServerTime() {
-		Long serverTime = null;
-		String name  = "ServerTimeProvider";
-		JSONObject requestBody = new JSONObject();
-		
+	public static Long getServerTime() {
 		try {
-			requestBody.put("name", name);
-			JSONObject responseObject = customCodeService.runJavaCode(name, requestBody);
-			
-			serverTime = responseObject.getLong("time");
-		} 
-		catch (JSONException e) {
-			e.printStackTrace();
+			String TIME_SERVER = "0.europe.pool.ntp.org";
+			NTPUDPClient timeClient = new NTPUDPClient();
+			InetAddress inetAddress = InetAddress.getByName(TIME_SERVER);
+
+			TimeInfo timeInfo = timeClient.getTime(inetAddress);
+			long returnTime = timeInfo.getMessage().getTransmitTimeStamp().getTime();
+
+			LOGGER.log(Level.INFO, "Current time: " + returnTime);
+			return returnTime;
+
+		} catch (UnknownHostException e) {
+			LOGGER.log(Level.SEVERE, "Couldn't get server time", e);
+		} catch (IOException e) {
+			LOGGER.log(Level.SEVERE, "Couldn't get server time", e);
 		}
-		
-		return serverTime;
+		return null;
 	}
 }
